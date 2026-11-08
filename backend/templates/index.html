@@ -1,0 +1,385 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Northside Clinic - AI Voice Assistant</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;display:flex;justify-content:center;align-items:center;min-height:100vh}
+.chat-container{width:95%;max-width:650px;height:85vh;min-height:450px;background:white;border-radius:18px;box-shadow:0 10px 35px rgba(0,0,0,.12);display:flex;flex-direction:column;overflow:hidden}
+.chat-header{background:#0f766e;color:white;padding:22px;text-align:center}
+.chat-header h2{margin:0 0 7px}
+.chat-header p{margin:0;font-size:14px;opacity:.9}
+.chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px}
+.message{max-width:82%;padding:12px 15px;border-radius:15px;line-height:1.5;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.ai-message{align-self:flex-start;background:#e2e8f0;color:#1e293b;border-bottom-left-radius:4px}
+.user-message{align-self:flex-end;background:#0f766e;color:white;border-bottom-right-radius:4px}
+.status{min-height:28px;text-align:center;font-size:13px;color:#64748b;padding:6px}
+.status.listening{color:#dc2626;font-weight:bold}
+.chat-input{display:flex;align-items:center;gap:10px;padding:15px;border-top:1px solid #e2e8f0}
+.chat-input input{flex:1;min-width:0;padding:12px;border:1px solid #cbd5e1;border-radius:10px;outline:none;font-size:14px}
+.chat-input input:focus{border-color:#0f766e}
+button{border:none;border-radius:10px;padding:12px 15px;cursor:pointer;font-weight:bold}
+#sendBtn{background:#0f766e;color:white}
+#micBtn{background:#e2e8f0;color:#334155;font-size:19px;min-width:52px}
+#micBtn.active{background:#dc2626;color:white;animation:pulse 1s infinite}
+#voiceBtn{background:#e2e8f0;color:#334155;font-size:18px}
+#voiceBtn.muted{background:#fee2e2;color:#991b1b}
+button:disabled{opacity:.5;cursor:not-allowed}
+@keyframes pulse{50%{transform:scale(1.08)}}
+@media(max-width:480px){
+  .chat-container{width:100%;height:100dvh;border-radius:0}
+  .chat-input{gap:6px;padding:10px}
+  button{padding:11px}
+}
+</style>
+</head>
+
+<body>
+<div class="chat-container">
+
+  <div class="chat-header">
+    <h2>Northside Clinic</h2>
+    <p>AI Customer Voice Assistant</p>
+  </div>
+
+  <div class="chat-messages" id="chatMessages">
+    <div class="message ai-message">Hello! Welcome to Northside Clinic. I'm an automated AI receptionist. How can I help you today?</div>
+  </div>
+
+  <div class="status" id="statusText">Click the microphone to start speaking.</div>
+
+  <div class="chat-input">
+    <input type="text" id="messageInput" placeholder="Type or speak your message..." autocomplete="off">
+    <button id="micBtn" type="button" title="Start microphone">🎤</button>
+    <button id="voiceBtn" type="button" title="Mute AI voice">🔊</button>
+    <button id="sendBtn" type="button">Send</button>
+  </div>
+
+</div>
+
+<script>
+const chatMessages=document.getElementById("chatMessages");
+const messageInput=document.getElementById("messageInput");
+const sendBtn=document.getElementById("sendBtn");
+const micBtn=document.getElementById("micBtn");
+const voiceBtn=document.getElementById("voiceBtn");
+const statusText=document.getElementById("statusText");
+
+let sessionId=null,isBusy=false,microphoneEnabled=false,recognitionRunning=false;
+let recognitionStarting=false,manualStopRequested=false,restartTimer=null;
+let recognizedSpeech="",interimSpeech="",recognition=null,voiceEnabled=true,recognitionFailed=false;
+
+const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+
+function addMessage(text,sender){
+  const element=document.createElement("div");
+  element.className="message "+(sender==="user"?"user-message":"ai-message");
+  element.textContent=text;
+  chatMessages.appendChild(element);
+  chatMessages.scrollTop=chatMessages.scrollHeight;
+}
+
+function speakAI(text){
+  if(!voiceEnabled)return;
+
+  if(!("speechSynthesis" in window)){
+    statusText.textContent="AI voice is not supported in this browser.";
+    return;
+  }
+
+  window.speechSynthesis.cancel();
+
+  const cleanText=text.replace(/\*\*/g,"").replace(/[#_`]/g,"").trim();
+  if(!cleanText)return;
+
+  const speech=new SpeechSynthesisUtterance(cleanText);
+  speech.lang="en-US";
+  speech.rate=.95;
+  speech.pitch=1;
+  speech.volume=1;
+
+  speech.onerror=e=>console.warn("Speech synthesis error:",e.error);
+  window.speechSynthesis.speak(speech);
+}
+
+voiceBtn.addEventListener("click",()=>{
+  voiceEnabled=!voiceEnabled;
+  voiceBtn.textContent=voiceEnabled?"🔊":"🔇";
+  voiceBtn.title=voiceEnabled?"Mute AI voice":"Enable AI voice";
+  voiceBtn.classList.toggle("muted",!voiceEnabled);
+
+  if(!voiceEnabled&&"speechSynthesis" in window){
+    window.speechSynthesis.cancel();
+  }
+
+  statusText.textContent=voiceEnabled?"AI voice enabled.":"AI voice muted.";
+});
+
+async function sendMessage(customMessage=null){
+  if(isBusy||microphoneEnabled)return;
+
+  const message=(customMessage!==null?customMessage:messageInput.value).trim();
+  if(!message)return;
+
+  isBusy=true;
+  messageInput.value="";
+  addMessage(message,"user");
+
+  sendBtn.disabled=true;
+  micBtn.disabled=true;
+  statusText.textContent="AI is thinking...";
+
+  try{
+    const response=await fetch("/api/chat",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        message,
+        session_id:sessionId
+      })
+    });
+
+    const data=await response.json();
+
+    if(!response.ok){
+      throw new Error(data.error||"Server error.");
+    }
+
+    if(data.session_id){
+      sessionId=data.session_id;
+    }
+
+    const reply=data.reply||"No response received.";
+
+    addMessage(reply,"ai");
+    statusText.textContent="AI replied.";
+    speakAI(reply);
+
+  }catch(error){
+    addMessage("Sorry, something went wrong: "+error.message,"ai");
+    statusText.textContent="Connection error.";
+
+  }finally{
+    isBusy=false;
+    sendBtn.disabled=false;
+    micBtn.disabled=!recognition;
+    messageInput.focus();
+  }
+}
+
+sendBtn.addEventListener("click",()=>sendMessage());
+
+messageInput.addEventListener("keydown",e=>{
+  if(e.key==="Enter"){
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+function updateMicrophoneUI(){
+  micBtn.classList.toggle("active",microphoneEnabled);
+  micBtn.textContent=microphoneEnabled?"⏹":"🎤";
+  micBtn.title=microphoneEnabled?"Stop and send speech":"Start microphone";
+  statusText.classList.toggle("listening",microphoneEnabled);
+
+  if(microphoneEnabled){
+    statusText.textContent="Listening... Press Stop when finished.";
+  }
+}
+
+function updateTranscript(){
+  messageInput.value=(recognizedSpeech+" "+interimSpeech).trim();
+}
+
+function startMicrophone(){
+  if(!recognition||isBusy||microphoneEnabled)return;
+
+  if("speechSynthesis" in window){
+    window.speechSynthesis.cancel();
+  }
+
+  microphoneEnabled=true;
+  manualStopRequested=false;
+  recognitionFailed=false;
+  recognizedSpeech="";
+  interimSpeech="";
+  messageInput.value="";
+
+  sendBtn.disabled=true;
+  updateMicrophoneUI();
+  startRecognitionSession();
+}
+
+function startRecognitionSession(){
+  if(!microphoneEnabled||recognitionRunning||recognitionStarting)return;
+
+  recognitionStarting=true;
+
+  try{
+    recognition.start();
+  }catch(error){
+    recognitionStarting=false;
+    microphoneEnabled=false;
+    recognitionFailed=true;
+    sendBtn.disabled=false;
+    updateMicrophoneUI();
+    statusText.textContent="Could not start microphone: "+error.message;
+  }
+}
+
+function stopMicrophone(){
+  if(!microphoneEnabled)return;
+
+  microphoneEnabled=false;
+  manualStopRequested=true;
+  clearTimeout(restartTimer);
+
+  updateMicrophoneUI();
+  statusText.textContent="Stopping microphone...";
+
+  if(recognitionRunning||recognitionStarting){
+    try{
+      recognition.stop();
+    }catch(error){
+      finishMicrophoneSession();
+    }
+  }else{
+    finishMicrophoneSession();
+  }
+}
+
+function finishMicrophoneSession(){
+  recognitionRunning=false;
+  recognitionStarting=false;
+  clearTimeout(restartTimer);
+
+  const finalMessage=(recognizedSpeech+" "+interimSpeech).trim();
+
+  recognizedSpeech="";
+  interimSpeech="";
+  manualStopRequested=false;
+
+  sendBtn.disabled=false;
+  updateMicrophoneUI();
+
+  if(finalMessage){
+    messageInput.value=finalMessage;
+    sendMessage(finalMessage);
+  }else{
+    statusText.textContent=recognitionFailed
+      ?"Speech recognition stopped due to an error."
+      :"No speech recognised. Try again.";
+  }
+}
+
+if(!SpeechRecognition){
+  micBtn.disabled=true;
+  statusText.textContent="Speech recognition is unavailable in this browser.";
+
+}else{
+  recognition=new SpeechRecognition();
+
+  recognition.lang="en-US";
+  recognition.continuous=true;
+  recognition.interimResults=true;
+  recognition.maxAlternatives=1;
+
+  recognition.onstart=function(){
+    recognitionStarting=false;
+    recognitionRunning=true;
+
+    if(!microphoneEnabled){
+      try{
+        recognition.stop();
+      }catch(error){
+        console.warn(error);
+      }
+      return;
+    }
+
+    updateMicrophoneUI();
+  };
+
+  recognition.onresult=function(event){
+    let newFinalText="";
+    let newInterimText="";
+
+    for(let i=event.resultIndex;i<event.results.length;i++){
+      const result=event.results[i];
+      const transcript=result[0].transcript.trim();
+
+      if(result.isFinal){
+        newFinalText+=transcript+" ";
+      }else{
+        newInterimText+=transcript+" ";
+      }
+    }
+
+    if(newFinalText.trim()){
+      recognizedSpeech+=newFinalText.trim()+" ";
+    }
+
+    interimSpeech=newInterimText.trim();
+    updateTranscript();
+  };
+
+  recognition.onerror=function(event){
+    console.warn("Speech recognition error:",event.error);
+
+    if(event.error==="no-speech")return;
+
+    if(["not-allowed","service-not-allowed","audio-capture","network"].includes(event.error)){
+      recognitionFailed=true;
+      microphoneEnabled=false;
+      manualStopRequested=false;
+
+      clearTimeout(restartTimer);
+      updateMicrophoneUI();
+      sendBtn.disabled=false;
+
+      statusText.textContent="Microphone error: "+event.error;
+    }
+  };
+
+  recognition.onend=function(){
+    recognitionRunning=false;
+    recognitionStarting=false;
+
+    if(manualStopRequested){
+      finishMicrophoneSession();
+      return;
+    }
+
+    if(microphoneEnabled){
+      clearTimeout(restartTimer);
+
+      restartTimer=setTimeout(()=>{
+        if(microphoneEnabled){
+          startRecognitionSession();
+        }
+      },300);
+
+      return;
+    }
+
+    updateMicrophoneUI();
+  };
+
+  micBtn.addEventListener("click",()=>{
+    if(isBusy)return;
+
+    if(microphoneEnabled){
+      stopMicrophone();
+    }else{
+      startMicrophone();
+    }
+  });
+}
+</script>
+
+</body>
+</html>

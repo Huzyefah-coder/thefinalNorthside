@@ -1,0 +1,53 @@
+
+{
+  "clinic_name": "Northside Clinic",
+  "assistant_identity": "I am Northside Clinic's automated AI assistant.",
+  "business_hours": {
+    "monday": "9:00 AM - 6:00 PM",
+    "tuesday": "9:00 AM - 6:00 PM",
+    "wednesday": "9:00 AM - 6:00 PM",
+    "thursday": "9:00 AM - 6:00 PM",
+    "friday": "9:00 AM - 6:00 PM",
+    "saturday": "9:00 AM - 6:00 PM",
+    "sunday": "Closed"
+  },
+  "services": [
+    "General Consultation",
+    "Dental Care",
+    "Orthopaedics"
+  ],
+  "appointment_policy": {
+    "booking": "Customers can submit appointment requests through the AI assistant.",
+    "confirmation": "All appointment requests remain pending until confirmed by clinic staff.",
+    "cancellation": "Customers may request appointment cancellation through the assistant.",
+    "rescheduling": "Customers may request to reschedule an existing appointment.",
+    "appointment_duration": "Appointment slots are scheduled in 30-minute intervals."
+  },
+  "faq": [
+    {
+      "question": "What are your opening hours?",
+      "answer": "Northside Clinic is open Monday to Saturday from 9 AM to 6 PM. We are closed on Sundays."
+    },
+    {
+      "question": "What services do you provide?",
+      "answer": "We offer General Consultation, Dental Care, and Orthopaedics."
+    },
+    {
+      "question": "Can I book an appointment?",
+      "answer": "Yes. I can help you submit an appointment request."
+    },
+    {
+      "question": "Can I cancel an appointment?",
+      "answer": "Yes. I can help you request cancellation of an existing appointment."
+    },
+    {
+      "question": "Can I reschedule my appointment?",
+      "answer": "Yes. I can help you reschedule an existing appointment."
+    },
+    {
+      "question": "Is my appointment automatically confirmed?",
+      "answer": "No. Appointment requests remain pending until clinic staff confirm them."
+    }
+  ],
+  "unknown_information_response": "I don't have verified information about that. I can refer your question to clinic staff for assistance."
+}

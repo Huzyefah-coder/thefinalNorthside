@@ -1,0 +1,693 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Northside Clinic | Staff Dashboard</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f1f5f9;color:#1e293b;font-family:Arial,sans-serif}
+header{background:#0f766e;color:white;padding:22px 5%;display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap}
+header h1{font-size:23px;margin:0}
+header p{font-size:13px;opacity:.9;margin:6px 0 0}
+main{max-width:1300px;margin:30px auto;padding:0 20px}
+button{border:0;border-radius:9px;padding:10px 14px;cursor:pointer;font-weight:bold}
+button:disabled{opacity:.5;cursor:not-allowed}
+.logout{background:white;color:#0f766e}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:25px}
+.card{background:white;padding:22px;border-radius:14px;box-shadow:0 3px 15px #0000000b}
+.card p{font-size:14px;color:#64748b;margin:0 0 12px}
+.card strong{font-size:31px}
+.tabs{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.tab{background:#e2e8f0;color:#334155}
+.tab.active{background:#0f766e;color:white}
+.panel{background:white;border-radius:14px;padding:22px;box-shadow:0 3px 15px #0000000b}
+.panel[hidden]{display:none}
+.panel h2{margin:0 0 18px;font-size:21px}
+.table-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:13px;text-align:left;border-bottom:1px solid #e2e8f0;vertical-align:top}
+th{background:#f8fafc;color:#475569;white-space:nowrap}
+td{overflow-wrap:anywhere;max-width:350px}
+.status{display:inline-block;border-radius:20px;padding:5px 10px;background:#fef3c7;color:#92400e;font-size:12px;font-weight:bold}
+.status.accepted,.status.completed{background:#dcfce7;color:#166534}
+.status.cancelled{background:#fee2e2;color:#991b1b}
+.action-buttons{display:flex;gap:6px;flex-wrap:wrap}
+.accept{background:#15803d;color:white}
+.reject{background:#dc2626;color:white}
+.complete,.view-chat{background:#0f766e;color:white}
+.view-chat{white-space:nowrap}
+.muted{color:#64748b}
+.notice{min-height:24px;margin-bottom:12px;font-size:14px}
+.refresh{background:#e2e8f0;color:#334155}
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.login-box{width:92%;max-width:410px;margin:12vh auto;background:white;border-radius:16px;padding:32px;box-shadow:0 8px 30px #00000015}
+.login-box h2{margin-top:0}
+.login-box input{display:block;width:100%;padding:13px;margin:15px 0;border:1px solid #cbd5e1;border-radius:9px}
+.login-box button{width:100%;background:#0f766e;color:white}
+.error{color:#b91c1c}
+.modal-backdrop{position:fixed;inset:0;background:#0f172ac7;display:flex;align-items:center;justify-content:center;padding:18px;z-index:1000}
+.modal-backdrop[hidden]{display:none}
+.modal{background:white;width:100%;max-width:760px;max-height:90vh;border-radius:16px;display:flex;flex-direction:column;overflow:hidden}
+.modal-header{padding:18px 22px;border-bottom:1px solid #e2e8f0;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.modal-header h2{margin:0 0 8px;font-size:20px}
+.modal-header p{margin:4px 0;font-size:12px;color:#64748b}
+.close-btn{background:#e2e8f0;color:#334155;font-size:20px}
+.chat-history{padding:20px;overflow-y:auto;min-height:120px;display:flex;flex-direction:column;gap:18px}
+.message-row{display:flex;flex-direction:column;gap:5px}
+.message-row.customer{align-items:flex-end}
+.message-row.assistant{align-items:flex-start}
+.bubble{max-width:85%;padding:13px 16px;border-radius:15px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55;font-size:14px}
+.customer .bubble{background:#0f766e;color:white;border-bottom-right-radius:4px}
+.assistant .bubble{background:#e2e8f0;color:#1e293b;border-bottom-left-radius:4px}
+.message-meta{font-size:11px;color:#64748b}
+.modal-footer{padding:14px 22px;border-top:1px solid #e2e8f0;text-align:right}
+.modal-footer button{background:#334155;color:white}
+body.modal-open{overflow:hidden}
+@media(max-width:850px){.cards{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:480px){.cards{grid-template-columns:1fr}main{padding:0 12px}.panel{padding:12px}.bubble{max-width:95%}}
+</style>
+</head>
+
+<body>
+
+{% if login_page %}
+
+<div class="login-box">
+  <h2>Northside Clinic</h2>
+  <p class="muted">Staff Dashboard Login</p>
+
+  {% if error %}
+  <p class="error">{{ error }}</p>
+  {% endif %}
+
+  <form method="POST" action="/dashboard/login">
+    <label for="password">Staff password</label>
+    <input id="password" name="password" type="password"
+           autocomplete="current-password" required>
+    <button type="submit">Log In</button>
+  </form>
+</div>
+
+{% else %}
+
+<header>
+  <div>
+    <h1>Northside Clinic</h1>
+    <p>AI Receptionist | Staff Management Dashboard</p>
+  </div>
+  <form method="POST" action="/dashboard/logout" id="logoutForm">
+    <button class="logout" type="submit">Log Out</button>
+  </form>
+</header>
+
+<main>
+  <div class="cards">
+    <div class="card">
+      <p>Total Appointments</p>
+      <strong id="appointmentsCount">—</strong>
+    </div>
+    <div class="card">
+      <p>Pending Appointments</p>
+      <strong id="pendingAppointmentsCount">—</strong>
+    </div>
+    <div class="card">
+      <p>Human Handoffs</p>
+      <strong id="handoffsCount">—</strong>
+    </div>
+    <div class="card">
+      <p>Pending Handoffs</p>
+      <strong id="pendingHandoffsCount">—</strong>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="tabs">
+      <button class="tab active" data-tab="appointments">Appointments</button>
+      <button class="tab" data-tab="handoffs">Human Handoffs</button>
+      <button class="tab" data-tab="sessions">Conversation Logs</button>
+    </div>
+    <button class="refresh" id="refreshBtn">Refresh Data</button>
+  </div>
+
+  <div id="notice" class="notice" role="status"></div>
+
+  <section class="panel" id="appointmentsPanel">
+    <h2>Appointment Requests</h2>
+    <p class="muted">
+      Accept or reject pending appointment requests.
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Customer</th>
+            <th>Service</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="appointmentsBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" id="handoffsPanel" hidden>
+    <h2>Human Handoff Requests</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th><th>Customer</th><th>Phone</th>
+            <th>Reason</th><th>Created</th>
+            <th>Status</th><th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="handoffsBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" id="sessionsPanel" hidden>
+    <h2>Conversation Logs</h2>
+    <p class="muted">
+      Latest 100 sessions. Click View Full Chat to read the saved conversation.
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Started</th><th>Ended</th>
+            <th>Intent</th><th>Outcome</th>
+            <th>Follow-up</th><th>Summary</th><th>Chat</th>
+          </tr>
+        </thead>
+        <tbody id="sessionsBody"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<div class="modal-backdrop" id="chatModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true"
+       aria-labelledby="chatTitle">
+    <div class="modal-header">
+      <div>
+        <h2 id="chatTitle">Full Conversation</h2>
+        <p id="chatStarted"></p>
+        <p id="chatOutcome"></p>
+      </div>
+      <button class="close-btn" id="closeChatTop"
+              aria-label="Close conversation">×</button>
+    </div>
+
+    <div class="chat-history" id="chatHistory"></div>
+
+    <div class="modal-footer">
+      <button id="closeChatBottom">Close Chat</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const csrfToken = {{ csrf_token|tojson }};
+const $ = id => document.getElementById(id);
+
+function cell(row, value) {
+  const td = document.createElement("td");
+  td.textContent = value == null || value === "" ? "—" : String(value);
+  row.appendChild(td);
+  return td;
+}
+
+function statusCell(row, value) {
+  const td = document.createElement("td");
+  const badge = document.createElement("span");
+
+  badge.className = "status";
+  const normalized = String(value || "").toLowerCase();
+
+  if (["accepted", "completed", "confirmed"].includes(normalized)) {
+    badge.classList.add("accepted");
+  }
+  if (["cancelled", "rejected"].includes(normalized)) {
+    badge.classList.add("cancelled");
+  }
+
+  badge.textContent = value || "—";
+  td.appendChild(badge);
+  row.appendChild(td);
+}
+
+function emptyRow(tbody, columns) {
+  const tr = document.createElement("tr");
+  const td = document.createElement("td");
+  td.colSpan = columns;
+  td.textContent = "No records found.";
+  td.className = "muted";
+  tr.appendChild(td);
+  tbody.appendChild(tr);
+}
+
+function showNotice(message, error=false) {
+  $("notice").textContent = message;
+  $("notice").style.color = error ? "#b91c1c" : "#0f766e";
+}
+
+// ======================================
+// NEW: ACCEPT / REJECT APPOINTMENTS
+// ======================================
+
+async function changeAppointmentStatus(id, newStatus) {
+  const action = newStatus === "Accepted" ? "accept" : "reject";
+
+  if (!confirm(
+    "Are you sure you want to " + action +
+    " appointment #" + id + "?"
+  )) {
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      "/api/staff/appointments/" + id + "/status",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken
+        },
+        body: JSON.stringify({status: newStatus})
+      }
+    );
+
+    if (response.status === 401) {
+      window.location.href = "/dashboard/login";
+      return;
+    }
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || "Could not update appointment.");
+    }
+
+    showNotice(result.message);
+    await loadDashboard();
+
+  } catch (error) {
+    showNotice(error.message, true);
+    await loadDashboard();
+  }
+}
+
+function renderAppointments(items) {
+  const body = $("appointmentsBody");
+  body.replaceChildren();
+
+  if (!items.length) return emptyRow(body, 7);
+
+  items.forEach(item => {
+    const tr = document.createElement("tr");
+
+    cell(tr, item.id);
+    cell(tr, item.customer_name);
+    cell(tr, item.service);
+    cell(tr, item.appointment_date);
+    cell(tr, item.appointment_time);
+    statusCell(tr, item.status);
+
+    const actionCell = document.createElement("td");
+
+    if (item.status === "Pending") {
+      const actions = document.createElement("div");
+      actions.className = "action-buttons";
+
+      const acceptButton = document.createElement("button");
+      acceptButton.className = "accept";
+      acceptButton.textContent = "Accept";
+
+      const rejectButton = document.createElement("button");
+      rejectButton.className = "reject";
+      rejectButton.textContent = "Reject";
+
+      acceptButton.addEventListener("click", async () => {
+        acceptButton.disabled = true;
+        rejectButton.disabled = true;
+        await changeAppointmentStatus(item.id, "Accepted");
+      });
+
+      rejectButton.addEventListener("click", async () => {
+        acceptButton.disabled = true;
+        rejectButton.disabled = true;
+        await changeAppointmentStatus(item.id, "Cancelled");
+      });
+
+      actions.appendChild(acceptButton);
+      actions.appendChild(rejectButton);
+      actionCell.appendChild(actions);
+
+    } else {
+      actionCell.textContent = "—";
+    }
+
+    tr.appendChild(actionCell);
+    body.appendChild(tr);
+  });
+}
+
+// ======================================
+// EXISTING HUMAN HANDOFFS
+// ======================================
+
+function renderHandoffs(items) {
+  const body = $("handoffsBody");
+  body.replaceChildren();
+
+  if (!items.length) return emptyRow(body, 7);
+
+  items.forEach(item => {
+    const tr = document.createElement("tr");
+
+    cell(tr, item.id);
+    cell(tr, item.customer_name);
+    cell(tr, item.phone_number);
+    cell(tr, item.reason);
+    cell(tr, item.created_at);
+    statusCell(tr, item.status);
+
+    const actionCell = document.createElement("td");
+
+    if (item.status === "Pending") {
+      const button = document.createElement("button");
+      button.className = "complete";
+      button.textContent = "Mark Completed";
+
+      button.addEventListener("click", async () => {
+        if (!confirm(
+          "Mark handoff #" + item.id + " as completed?"
+        )) return;
+
+        button.disabled = true;
+
+        try {
+          const response = await fetch(
+            "/api/staff/handoffs/" + item.id + "/complete",
+            {
+              method: "POST",
+              headers: {"X-CSRF-Token": csrfToken}
+            }
+          );
+
+          if (response.status === 401) {
+            window.location.href = "/dashboard/login";
+            return;
+          }
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            throw new Error(result.error || "Update failed.");
+          }
+
+          showNotice("Handoff #" + item.id + " marked completed.");
+          await loadDashboard();
+
+        } catch (error) {
+          showNotice(error.message, true);
+          button.disabled = false;
+        }
+      });
+
+      actionCell.appendChild(button);
+
+    } else {
+      actionCell.textContent = "Completed";
+    }
+
+    tr.appendChild(actionCell);
+    body.appendChild(tr);
+  });
+}
+
+// ======================================
+// EXISTING CONVERSATION LOGS
+// ======================================
+
+function renderSessions(items) {
+  const body = $("sessionsBody");
+  body.replaceChildren();
+
+  if (!items.length) return emptyRow(body, 7);
+
+  items.forEach(item => {
+    const tr = document.createElement("tr");
+
+    cell(tr, item.started_at);
+    cell(tr, item.ended_at);
+    cell(tr, item.detected_intent);
+    cell(tr, item.outcome);
+    cell(tr, item.follow_up_status);
+    cell(tr, item.summary);
+
+    const actionCell = document.createElement("td");
+    const button = document.createElement("button");
+
+    button.className = "view-chat";
+    button.textContent = "View Full Chat";
+
+    button.addEventListener("click", () => {
+      openFullChat(item.session_id);
+    });
+
+    actionCell.appendChild(button);
+    tr.appendChild(actionCell);
+    body.appendChild(tr);
+  });
+}
+
+// ======================================
+// EXISTING FULL CONVERSATION VIEWER
+// ======================================
+
+let previousFocus = null;
+
+function closeFullChat() {
+  $("chatModal").hidden = true;
+  document.body.classList.remove("modal-open");
+
+  if (previousFocus) {
+    previousFocus.focus();
+    previousFocus = null;
+  }
+}
+
+async function openFullChat(sessionId) {
+  previousFocus = document.activeElement;
+
+  $("chatModal").hidden = false;
+  document.body.classList.add("modal-open");
+
+  $("chatStarted").textContent = "";
+  $("chatOutcome").textContent = "";
+  $("chatHistory").replaceChildren();
+
+  $("closeChatTop").focus();
+
+  const loading = document.createElement("p");
+  loading.textContent = "Loading conversation...";
+  loading.className = "muted";
+  $("chatHistory").appendChild(loading);
+
+  try {
+    const response = await fetch(
+      "/api/staff/sessions/" +
+      encodeURIComponent(sessionId) +
+      "/transcript",
+      {cache: "no-store"}
+    );
+
+    if (response.status === 401) {
+      window.location.href = "/dashboard/login";
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error("Could not retrieve this conversation.");
+    }
+
+    const data = await response.json();
+
+    $("chatStarted").textContent =
+      "Started: " + (data.started_at || "Unknown");
+
+    $("chatOutcome").textContent =
+      "Intent: " + (data.intent || "Unknown") +
+      " | Outcome: " + (data.outcome || "Unknown");
+
+    const history = $("chatHistory");
+    history.replaceChildren();
+
+    if (!Array.isArray(data.transcript) ||
+        data.transcript.length === 0) {
+      const empty = document.createElement("p");
+      empty.textContent = "No messages were saved for this conversation.";
+      empty.className = "muted";
+      history.appendChild(empty);
+      return;
+    }
+
+    data.transcript.forEach(entry => {
+      const isCustomer = entry.role === "customer";
+
+      const row = document.createElement("div");
+      row.className =
+        "message-row " + (isCustomer ? "customer" : "assistant");
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.textContent = entry.text || "";
+
+      const meta = document.createElement("div");
+      meta.className = "message-meta";
+      meta.textContent =
+        (isCustomer ? "Customer" : "AI Receptionist") +
+        (entry.at ? " · " + entry.at : "");
+
+      row.appendChild(bubble);
+      row.appendChild(meta);
+      history.appendChild(row);
+    });
+
+  } catch (error) {
+    $("chatHistory").replaceChildren();
+
+    const p = document.createElement("p");
+    p.className = "error";
+    p.textContent = error.message;
+    $("chatHistory").appendChild(p);
+  }
+}
+
+$("closeChatTop").addEventListener("click", closeFullChat);
+$("closeChatBottom").addEventListener("click", closeFullChat);
+
+$("chatModal").addEventListener("click", event => {
+  if (event.target === $("chatModal")) closeFullChat();
+});
+
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && !$("chatModal").hidden) {
+    closeFullChat();
+  }
+
+  if (event.key === "Tab" && !$("chatModal").hidden) {
+    const focusable = [
+      $("closeChatTop"),
+      $("closeChatBottom")
+    ];
+    const current = focusable.indexOf(document.activeElement);
+
+    if (event.shiftKey && current <= 0) {
+      event.preventDefault();
+      focusable[focusable.length - 1].focus();
+    } else if (
+      !event.shiftKey &&
+      current === focusable.length - 1
+    ) {
+      event.preventDefault();
+      focusable[0].focus();
+    }
+  }
+});
+
+// ======================================
+// EXISTING DASHBOARD DATA
+// ======================================
+
+async function loadDashboard() {
+  try {
+    const response = await fetch("/api/staff/dashboard", {
+      cache: "no-store"
+    });
+
+    if (response.status === 401) {
+      window.location.href = "/dashboard/login";
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error("Unable to load dashboard.");
+    }
+
+    const data = await response.json();
+
+    $("appointmentsCount").textContent =
+      data.counts.appointments;
+
+    $("pendingAppointmentsCount").textContent =
+      data.counts.pending_appointments;
+
+    $("handoffsCount").textContent =
+      data.counts.handoffs;
+
+    $("pendingHandoffsCount").textContent =
+      data.counts.pending_handoffs;
+
+    renderAppointments(data.appointments);
+    renderHandoffs(data.handoffs);
+    renderSessions(data.sessions);
+
+  } catch (error) {
+    showNotice(error.message, true);
+  }
+}
+
+document.querySelectorAll(".tab").forEach(button => {
+  button.addEventListener("click", () => {
+    const active = button.dataset.tab;
+
+    document.querySelectorAll(".tab").forEach(tab => {
+      tab.classList.toggle("active", tab === button);
+    });
+
+    ["appointments", "handoffs", "sessions"].forEach(name => {
+      $(name + "Panel").hidden = name !== active;
+    });
+  });
+});
+
+$("refreshBtn").addEventListener("click", loadDashboard);
+
+$("logoutForm").addEventListener("submit", async event => {
+  event.preventDefault();
+
+  try {
+    const response = await fetch("/dashboard/logout", {
+      method: "POST",
+      headers: {"X-CSRF-Token": csrfToken}
+    });
+
+    if (!response.ok) {
+      throw new Error("Logout failed.");
+    }
+
+    window.location.href = "/dashboard/login";
+
+  } catch (error) {
+    showNotice(error.message, true);
+  }
+});
+
+loadDashboard();
+</script>
+
+{% endif %}
+
+</body>
+</html>
